@@ -1,0 +1,11 @@
+prefix=../../../..
+exec_prefix=${prefix}/bin/mingw810_32/bin
+libdir=${prefix}/bin/mingw810_32/lib
+includedir=${prefix}/include
+
+Name: leptonica
+Description: An open source C library for efficient image processing and image analysis operations
+Version: 1.83.1
+Libs: -L${libdir} -lleptonica-1.83.1
+Libs.private:  -lgif -ljpeg -lpng -ltiff -lz -lwebp -lwebpmux -lopenjp2 -lm
+Cflags: -I${includedir} -I${includedir}/leptonica

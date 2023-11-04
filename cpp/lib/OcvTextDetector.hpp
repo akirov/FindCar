@@ -1,0 +1,5 @@
+#ifndef __OCVTEXTDETECTOR_HPP__
+#define __OCVTEXTDETECTOR_HPP__
+
+
+#endif  // __OCVTEXTDETECTOR_HPP__

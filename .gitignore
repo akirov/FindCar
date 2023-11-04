@@ -1,0 +1,9 @@
+.ide/
+.idea/
+.vscode/
+*.code-workspace
+*.user
+*.o
+build/
+data/
+docs/
