@@ -5,5 +5,5 @@
 *.user
 *.o
 build/
-data/
+test/
 docs/
