@@ -24,5 +24,3 @@ def detect_plates_ocv(image, cascade_uri):
     for x,y,w,h in plate_rects:  # 2D numpy array, each row is [x y w h]
         cv2.rectangle(img, (x,y), (x+w,y+h), (255,0,0), 2)
     return plate_rects, img
-
-
