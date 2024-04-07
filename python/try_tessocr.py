@@ -2,7 +2,7 @@ import os
 import sys
 from PIL import Image
 import matplotlib.pyplot as plt
-from img_utils import read_and_convert_PIL, read_and_convert_OCV_to_PIL
+from img_utils import read_and_convert_PIL, read_and_convert_OCV_to_PIL, read_OCV_bytes
 
 if 'TESSDATA_PREFIX' not in os.environ:
     os.environ['TESSDATA_PREFIX'] = r'../tesseract/tessdata'
@@ -12,7 +12,8 @@ import tesserocr as tocr
 print(tocr.get_languages())
 
 
-images = ['../data/test/bul_001.jpg', '../data/test/bul_001_seg.jpg']  # , '../data/test/bul_001_seg.png'
+images = ['../data/test/bul_001.jpg', '../data/test/bul_001_seg.jpg',  # , '../data/test/bul_001_seg.png'
+          '../data/test/bul_003_dirt.jpg']
 
 for img_uri in images:
     print("\nfile_to_text(", img_uri, ") = '", tocr.file_to_text(img_uri), "'")
@@ -42,6 +43,11 @@ with tocr.PyTessBaseAPI(lang='eng', psm=7, oem=3) as api:
 
         api.SetImage(read_and_convert_OCV_to_PIL(img_uri))
         print("SetImage(read_and_convert_OCV_to_PIL): ", img_uri)
+        print("GetUTF8Text: '", api.GetUTF8Text(), "'")
+        print("Confidence per word: ", api.AllWordConfidences())
+
+        api.SetImageBytes(*read_OCV_bytes(img_uri))  # img_bytes, width, height, bytes_per_pixel, bytes_per_line
+        print("SetImageBytes(read_OCV_bytes): ", img_uri)
         print("GetUTF8Text: '", api.GetUTF8Text(), "'")
         print("Confidence per word: ", api.AllWordConfidences())
 

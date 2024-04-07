@@ -14,6 +14,15 @@ def read_and_convert_OCV_to_PIL(image_uri):
     return Image.fromarray(img_rgb)
 
 
+def read_OCV_bytes(img_uri):
+    img = cv2.imread(img_uri, cv2.IMREAD_COLOR)
+    bpp = img.shape[2] if len(img.shape) > 2 else 1
+    if bpp > 1:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    #      img_bytes,     width,        height,       bytes_per_pixel, bytes_per_line
+    return img.tobytes(), img.shape[1], img.shape[0], bpp,             bpp*img.shape[1]
+
+
 def detect_plates_ocv(image, cascade_uri):
     carplate_haar_cascade = cv2.CascadeClassifier(cascade_uri)
     img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
