@@ -3,7 +3,7 @@ import sys
 from PIL import Image
 import matplotlib.pyplot as plt
 import cv2
-from img_utils import detect_plates_ocv
+from img_utils import detect_plates_ocv_haar, preprocess_plate
 
 TESSERACT_PREFIX = r'../tesseract'
 #if 'TESSDATA_PREFIX' not in os.environ:
@@ -115,13 +115,15 @@ def detect_plates_tess(image, conf=''):
     return plate_rects, img
 
 
-def read_plates(image, plate_rects, conf='', title=''):
+def read_plates(image, plate_rects, conf='', title='', preprocess=False):
     for x,y,w,h in plate_rects:
         plate = image[y:y+h, x:x+w]
         if title: plt.figure(num=title+f" [x={x},y={y},w={w},h={h}]")
-        plt.imshow(plate)
+        if preprocess:
+            plate = preprocess_plate(plate)
+        plt.imshow(plate, cmap='gray' if len(plate.shape) < 3 else None)
         plt.show()
-        if not conf: conf = '-l eng --oem 3 --psm 7'
+        if not conf: conf = my_config
         text = pytesseract.image_to_string(plate, config=conf)
         print(f"{title} image['{y}':'{y+h}', '{x}':'{x+w}'], image_to_string('{conf}'): '{text}'")
 
@@ -149,6 +151,7 @@ def draw_data_dict(img, data_dict):
         if data_dict['word_num'][i] == 0 or data_dict['conf'][i] < 0: continue
         (x, y, w, h) = (data_dict['left'][i], data_dict['top'][i], data_dict['width'][i], data_dict['height'][i])
         cv2.rectangle(img_with_boxes, (x, y), (x + w, y + h), (0, 255, 0), 1)
+        cv2.putText(img_with_boxes, data_dict['text'][i], (x + 2, y + h - 2), cv2.FONT_HERSHEY_PLAIN, 1, (0,255,0), 1)
     return img_with_boxes
 
 
@@ -199,6 +202,10 @@ if __name__ == "__main__":
     text = pytesseract.image_to_string(img_bgr, config=my_config)
     print(f"OpenCV BGR image_to_string('{my_config}'): '{text}'")
 
+    img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    text = pytesseract.image_to_string(img_gray, config=my_config)
+    print(f"OpenCV Gray image_to_string('{my_config}'): '{text}'")
+
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)  # OpenCV default format is BGR
     text = pytesseract.image_to_string(img_rgb, config=my_config)
     print(f"OpenCV RGB image_to_string('{my_config}'): '{text}'")
@@ -228,12 +235,16 @@ if __name__ == "__main__":
     read_plates(img_rgb, plate_rects_ts, conf=my_config, title='detect_plates_tess')
 
     # Detect plates' positions with OpenCV Haar cascade and read them
-    plate_rects_cv, img_with_plates_cv = detect_plates_ocv(img_rgb, '../opencv/data/haarcascades/haarcascade_russian_plate_number_[SF=1.01]_[MN=4].xml')
+    plate_rects_cv, img_with_plates_cv = detect_plates_ocv_haar(img_rgb, '../opencv/data/haarcascades/haarcascade_russian_plate_number_[SF=1.01]_[MN=4].xml')
     print("plate_rects_cv:\n", plate_rects_cv)
-    plt.figure(num='OpenCV RGB image with detect_plates_ocv boxes')
-    plt.imshow(img_with_plates_cv)  # , cmap='gray'
+    plt.figure(num='OpenCV RGB image with detect_plates_ocv_haar boxes')
+    plt.imshow(img_with_plates_cv)
     plt.show()
-    read_plates(img_rgb, plate_rects_cv, conf=my_config, title='detect_plates_ocv')
+    read_plates(img_rgb, plate_rects_cv, conf=my_config, title='detect_plates_ocv_haar', preprocess=True)
 
-
-    # Apply image pre-processing
+    plate_rects_cv_gray, img_gray_with_plates_cv = detect_plates_ocv_haar(img_gray, '../opencv/data/haarcascades/haarcascade_russian_plate_number_[SF=1.01]_[MN=4].xml')
+    print("plate_rects_cv_gray:\n", plate_rects_cv_gray)
+    plt.figure(num='OpenCV Gray image with detect_plates_ocv_haar boxes')
+    plt.imshow(img_gray_with_plates_cv, cmap='gray')
+    plt.show()
+    read_plates(img_gray, plate_rects_cv_gray, conf=my_config, title='detect_plates_ocv_haar_gray', preprocess=True)
