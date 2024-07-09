@@ -125,7 +125,7 @@ def read_plates(image, plate_rects, conf='', title='', preprocess=False):
         plt.show()
         if not conf: conf = my_config
         text = pytesseract.image_to_string(plate, config=conf)
-        print(f"{title} image['{y}':'{y+h}', '{x}':'{x+w}'], image_to_string('{conf}'): '{text}'")
+        print(f"{title} image[x={x}:{x+w}, y={y}:{y+h}], image_to_string('{conf}'): '{text}'")
 
 
 def draw_boxes_txt(img, boxes_txt):
@@ -172,6 +172,7 @@ if __name__ == "__main__":
         print(f"image_to_osd({image_uri}):\n{osd}")
     except:
         print("Error in image_to_osd()")
+    print()
 
 
     # Consider the whole image, using PIL
@@ -194,21 +195,21 @@ if __name__ == "__main__":
 
     # Consider the whole image, using OpenCV
     img_bgr = cv2.imread(image_uri, cv2.IMREAD_COLOR)
-    print("OpenCV imread", image_uri, img_bgr.shape)
+    print(f"OpenCV imread '{image_uri}', (h,w,c)={img_bgr.shape}\n")
     cv2.imshow('Whole image loaded with OpenCV', img_bgr)
     cv2.waitKey(10000)
     cv2.destroyAllWindows()
 
     text = pytesseract.image_to_string(img_bgr, config=my_config)
-    print(f"OpenCV BGR image_to_string('{my_config}'): '{text}'")
+    print(f"OpenCV BGR image_to_string('{my_config}'): '{text}'\n")
 
     img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     text = pytesseract.image_to_string(img_gray, config=my_config)
-    print(f"OpenCV Gray image_to_string('{my_config}'): '{text}'")
+    print(f"OpenCV Gray image_to_string('{my_config}'): '{text}'\n")
 
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)  # OpenCV default format is BGR
     text = pytesseract.image_to_string(img_rgb, config=my_config)
-    print(f"OpenCV RGB image_to_string('{my_config}'): '{text}'")
+    print(f"OpenCV RGB image_to_string('{my_config}'): '{text}'\n")
 
     boxes_txt = pytesseract.image_to_boxes(img_rgb, config=my_config)
     print(f"OpenCV RGB image_to_boxes:\n{boxes_txt}")
@@ -228,22 +229,24 @@ if __name__ == "__main__":
 
     # Detect plates' positions using Tesseract and read them
     plate_rects_ts, img_with_plates_ts = detect_plates_tess(img_rgb)
-    print("plate_rects_ts:\n", plate_rects_ts)
+    print("plate_rects_ts [[x,y,w,h]]:\n", plate_rects_ts)
     plt.figure(num='OpenCV RGB image with detect_plates_tess boxes')
     plt.imshow(img_with_plates_ts)
     plt.show()
     read_plates(img_rgb, plate_rects_ts, conf=my_config, title='detect_plates_tess')
+    print()
 
     # Detect plates' positions with OpenCV Haar cascade and read them
     plate_rects_cv, img_with_plates_cv = detect_plates_ocv_haar(img_rgb, '../opencv/data/haarcascades/haarcascade_russian_plate_number_[SF=1.01]_[MN=4].xml')
-    print("plate_rects_cv:\n", plate_rects_cv)
+    print("plate_rects_cv [[x,y,w,h]]:\n", plate_rects_cv)
     plt.figure(num='OpenCV RGB image with detect_plates_ocv_haar boxes')
     plt.imshow(img_with_plates_cv)
     plt.show()
     read_plates(img_rgb, plate_rects_cv, conf=my_config, title='detect_plates_ocv_haar', preprocess=True)
+    print()
 
     plate_rects_cv_gray, img_gray_with_plates_cv = detect_plates_ocv_haar(img_gray, '../opencv/data/haarcascades/haarcascade_russian_plate_number_[SF=1.01]_[MN=4].xml')
-    print("plate_rects_cv_gray:\n", plate_rects_cv_gray)
+    print("plate_rects_cv_gray [[x,y,w,h]]:\n", plate_rects_cv_gray)
     plt.figure(num='OpenCV Gray image with detect_plates_ocv_haar boxes')
     plt.imshow(img_gray_with_plates_cv, cmap='gray')
     plt.show()
