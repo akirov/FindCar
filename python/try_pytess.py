@@ -3,7 +3,7 @@ import sys
 from PIL import Image
 import matplotlib.pyplot as plt
 import cv2
-from img_utils import detect_plates_ocv_haar, preprocess_plate
+from img_utils import detect_plates_ocv_haar, preprocess_plate, plt_imshow_actual_size
 
 TESSERACT_PREFIX = r'../tesseract'
 #if 'TESSDATA_PREFIX' not in os.environ:
@@ -95,7 +95,7 @@ else:
 #  language_model_penalty_non_freq_dict_word 0.1     Penalty for words not in the frequent word dictionary
 #  language_model_penalty_non_dict_word      0.15    Penalty for non-dictionary words
 
-my_config = '-l eng --oem 3 --psm 7'
+my_config = '-l eng --psm 7'  #  --oem 3
 my_config += ' -c tessedit_char_whitelist="ABCEHKMOPTXY0123456789 ."'
 #my_config += ' -c user_patterns_suffix="patterns"'
 #my_config += ' -c textord_noise_rejrows=0'
@@ -103,7 +103,7 @@ my_config += ' -c tessedit_char_whitelist="ABCEHKMOPTXY0123456789 ."'
 
 def detect_plates_tess(image, conf=''):
     img = image.copy()
-    if not conf: conf = '--psm 11'
+    if not conf: conf = '--psm 11 -c tessedit_char_whitelist="ABCEHKMOPTXY0123456789 ."'
     image_data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT, config=conf)
     #print(image_data)
     plate_rects = []
@@ -113,19 +113,6 @@ def detect_plates_tess(image, conf=''):
         plate_rects.append([x, y, w, h])
         cv2.rectangle(img, (x,y), (x+w,y+h), (255,0,0), 2)
     return plate_rects, img
-
-
-def read_plates(image, plate_rects, conf='', title='', preprocess=False):
-    for x,y,w,h in plate_rects:
-        plate = image[y:y+h, x:x+w]
-        if title: plt.figure(num=title+f" [x={x},y={y},w={w},h={h}]")
-        if preprocess:
-            plate = preprocess_plate(plate)
-        plt.imshow(plate, cmap='gray' if len(plate.shape) < 3 else None)
-        plt.show()
-        if not conf: conf = my_config
-        text = pytesseract.image_to_string(plate, config=conf)
-        print(f"{title} image[x={x}:{x+w}, y={y}:{y+h}], image_to_string('{conf}'): '{text}'")
 
 
 def draw_boxes_txt(img, boxes_txt):
@@ -155,6 +142,44 @@ def draw_data_dict(img, data_dict):
     return img_with_boxes
 
 
+def read_plates(image, plate_rects, conf='', title='', preprocess=False, detect_tess_boxes=False):
+    plate_txts = []
+    #col = 200 if len(image.shape) < 3 else (0,255,0)
+    for i, (x0,y0,w0,h0) in enumerate(plate_rects):
+        plate = image[y0:y0+h0, x0:x0+w0]
+        if title: plt.figure(num=title+f" [x={x0},y={y0},w={w0},h={h0}]")
+        if preprocess:  # and h > ...
+            plate = preprocess_plate(plate)
+        if not conf: conf = my_config
+        if detect_tess_boxes:
+            text = ''
+            image_data = pytesseract.image_to_data(plate, output_type=pytesseract.Output.DICT, config='--psm 11')
+            for j in range(0, len(image_data['conf'])):
+                if image_data['conf'][j] < 0: continue
+                x, y, w, h = image_data['left'][j], image_data['top'][j], image_data['width'][j], image_data['height'][j]
+                box = plate[y:y+h, x:x+w]
+                txt = pytesseract.image_to_string(box, config=conf)
+                text += (' ' if text and txt else '') + txt.strip()
+                #cv2.rectangle(plate, (x,y), (x+w,y+h), col, 2)  # This modifies the plate!
+        else:
+            text = (pytesseract.image_to_string(plate, config=conf)).strip()
+        plt.imshow(plate, cmap='gray' if len(plate.shape) < 3 else None)
+        plt.show()
+        print(f"{title} image[x={x0}:{x0+w0}, y={y0}:{y0+h0}], image_to_string('{conf}'): '{text}'")
+        plate_txts.append(text)
+    return plate_txts
+
+
+def postprocess_plate_txt(plate_txt, country='BG'):
+    # Remove starting or trailing numbers
+    # Remove starting or trailing more than 2 letters
+    # Replace '.' with ' '
+    # X-Y processing
+    # Match first letters from the possible choices (for the country)
+    # Consider temporary and two-row numbers?
+    return plate_txt
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print(f"Usage: python {sys.argv[0]} image_uri")
@@ -177,9 +202,10 @@ if __name__ == "__main__":
 
     # Consider the whole image, using PIL
     image = Image.open(image_uri)
-    plt.figure(num='Whole image loaded with PIL')
-    plt.imshow(image)
-    plt.show()
+    #plt.figure(num='Whole image loaded with PIL')
+    #plt.imshow(image)
+    #plt.show()
+    plt_imshow_actual_size(image, title='Whole image loaded with PIL')
 
     text_from_image = pytesseract.image_to_string(image, lang='eng')
     print(f"PIL image_to_string(lang='eng'): '{text_from_image}'")
@@ -196,6 +222,8 @@ if __name__ == "__main__":
     # Consider the whole image, using OpenCV
     img_bgr = cv2.imread(image_uri, cv2.IMREAD_COLOR)
     print(f"OpenCV imread '{image_uri}', (h,w,c)={img_bgr.shape}\n")
+    #cv2.namedWindow('Whole image loaded with OpenCV', cv2.WINDOW_NORMAL)  # WINDOW_OPENGL
+    #cv2.resizeWindow('Whole image loaded with OpenCV', 1+int(img_bgr.shape[1]*100/125), 1+int(img_bgr.shape[0]*100/125))
     cv2.imshow('Whole image loaded with OpenCV', img_bgr)
     cv2.waitKey(10000)
     cv2.destroyAllWindows()
@@ -203,7 +231,7 @@ if __name__ == "__main__":
     text = pytesseract.image_to_string(img_bgr, config=my_config)
     print(f"OpenCV BGR image_to_string('{my_config}'): '{text}'\n")
 
-    img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)  # cv2.imread(image_uri, cv2.IMREAD_GRAYSCALE)
     text = pytesseract.image_to_string(img_gray, config=my_config)
     print(f"OpenCV Gray image_to_string('{my_config}'): '{text}'\n")
 
@@ -214,40 +242,49 @@ if __name__ == "__main__":
     boxes_txt = pytesseract.image_to_boxes(img_rgb, config=my_config)
     print(f"OpenCV RGB image_to_boxes:\n{boxes_txt}")
     img_rgb_with_char_boxes = draw_boxes_txt(img_rgb, boxes_txt)
-    plt.figure(num='OpenCV img_rgb_with_char_boxes')
-    plt.imshow(img_rgb_with_char_boxes)
-    plt.show()
+    plt_imshow_actual_size(img_rgb_with_char_boxes, title='OpenCV img_rgb_with_char_boxes')
 
     data_txt = pytesseract.image_to_data(img_rgb, config=my_config)
     print(f"OpenCV RGB image_to_data:\n{data_txt}")
     data_dict = pytesseract.image_to_data(img_rgb, config=my_config, output_type=pytesseract.Output.DICT)
     img_rgb_with_word_boxes = draw_data_dict(img_rgb, data_dict)
-    plt.figure(num='OpenCV img_rgb_with_word_boxes')
-    plt.imshow(img_rgb_with_word_boxes)
-    plt.show()
+    plt_imshow_actual_size(img_rgb_with_word_boxes, title='OpenCV img_rgb_with_word_boxes')
 
+
+    # Plate recognition pipeline:
+    # 1. Detect number plates using Tesseract image_to_data() or better with Haar cascade classifier
+    # 2. Pre-process plate boxes (optional): filter by size, find intersecting and one-into-another
+    #  boxes, then for sub-boxes keep inner ones (with smaller area), for intersecting boxes take
+    #  the wrapping box, auto-crop, filter by color, call pytesseract.image_to_data() inside Haar boxes
+    # 3. Pre-process plates: convert to grayscale (needed for Otsu binarization), invert (if needed) to
+    #  have black text on white, filter noise, binarize, erode and/or dilate, crop more, rotate, scale...
+    # 4. Recognize text with Tesseract
+    # 5. Post-process the result: remove starting or trailing numbers, remove starting or trailing more
+    #  than 2 letters, replace '.' with ' ', X-Y processing, country-specific processing
 
     # Detect plates' positions using Tesseract and read them
     plate_rects_ts, img_with_plates_ts = detect_plates_tess(img_rgb)
     print("plate_rects_ts [[x,y,w,h]]:\n", plate_rects_ts)
-    plt.figure(num='OpenCV RGB image with detect_plates_tess boxes')
-    plt.imshow(img_with_plates_ts)
-    plt.show()
+    plt_imshow_actual_size(img_with_plates_ts, title='OpenCV RGB image with detect_plates_tess boxes')
     read_plates(img_rgb, plate_rects_ts, conf=my_config, title='detect_plates_tess')
     print()
 
     # Detect plates' positions with OpenCV Haar cascade and read them
-    plate_rects_cv, img_with_plates_cv = detect_plates_ocv_haar(img_rgb, '../opencv/data/haarcascades/haarcascade_russian_plate_number_[SF=1.01]_[MN=4].xml')
+    plate_rects_cv, img_with_plates_cv = detect_plates_ocv_haar(img_rgb,
+        '../opencv/data/haarcascades/haarcascade_russian_plate_number_[SF=1.01]_[MN=4].xml',
+        auto_crop=True)  #, img_uri=image_uri
     print("plate_rects_cv [[x,y,w,h]]:\n", plate_rects_cv)
-    plt.figure(num='OpenCV RGB image with detect_plates_ocv_haar boxes')
-    plt.imshow(img_with_plates_cv)
-    plt.show()
-    read_plates(img_rgb, plate_rects_cv, conf=my_config, title='detect_plates_ocv_haar', preprocess=True)
+    plt_imshow_actual_size(img_with_plates_cv, title='OpenCV RGB image with detect_plates_ocv_haar boxes')
+    read_plates(img_rgb, plate_rects_cv, conf=my_config, title='detect_plates_ocv_haar', preprocess=False)  #, detect_tess_boxes=True
+    plate_txts = read_plates(img_rgb, plate_rects_cv, conf=my_config, title='detect_plates_ocv_haar_processed', preprocess=True)
+    for txt in plate_txts:
+        plate_txt = postprocess_plate_txt(txt)
     print()
 
-    plate_rects_cv_gray, img_gray_with_plates_cv = detect_plates_ocv_haar(img_gray, '../opencv/data/haarcascades/haarcascade_russian_plate_number_[SF=1.01]_[MN=4].xml')
+    plate_rects_cv_gray, img_gray_with_plates_cv = detect_plates_ocv_haar(img_gray,
+        '../opencv/data/haarcascades/haarcascade_russian_plate_number_[SF=1.01]_[MN=4].xml',
+        auto_crop=True)  #, img_uri=image_uri
     print("plate_rects_cv_gray [[x,y,w,h]]:\n", plate_rects_cv_gray)
-    plt.figure(num='OpenCV Gray image with detect_plates_ocv_haar boxes')
-    plt.imshow(img_gray_with_plates_cv, cmap='gray')
-    plt.show()
-    read_plates(img_gray, plate_rects_cv_gray, conf=my_config, title='detect_plates_ocv_haar_gray', preprocess=True)
+    plt_imshow_actual_size(img_gray_with_plates_cv, title='OpenCV Gray image with detect_plates_ocv_haar boxes')
+    read_plates(img_gray, plate_rects_cv_gray, conf=my_config, title='detect_plates_ocv_haar_gray', preprocess=False)
+    read_plates(img_gray, plate_rects_cv_gray, conf=my_config, title='detect_plates_ocv_haar_gray_processed', preprocess=True)
