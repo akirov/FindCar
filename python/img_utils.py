@@ -103,6 +103,7 @@ def detect_plates_ocv_haar(image, cascade_uri, img_uri='', min_size=(60,20), max
         cw = 0.97  # varies
         ch = 0.56
         for i, (x0,y0,w0,h0) in enumerate(plate_rects):
+            #if h0 < 25: continue
             x = x0 + int(cx*w0)
             y = y0 + int(cy*h0)
             w = int(cw*w0)
@@ -119,8 +120,9 @@ def detect_plates_ocv_haar(image, cascade_uri, img_uri='', min_size=(60,20), max
     return plate_rects, img
 
 
-def preprocess_plate(np_image, convertion=cv2.COLOR_RGB2GRAY):
+def preprocess_plate(np_image, convertion=cv2.COLOR_RGB2GRAY, scale=False):
     # To facilitate Tesseract OCR, pre-process number plate regions:
+    # - scale down large images, because recognition doesn't work well for letters above 70pt, optimal: 20-40 pt
     # - convert to gray (needed for Otsu) and invert (if needed), to have black text on white background
     # - filter noise (dust), if it can be done fast: GaussianBlur, medianBlur, ...
     # - convert to binary: simple thresholding (only for ideal images), adaptive (for small letters),
@@ -133,27 +135,38 @@ def preprocess_plate(np_image, convertion=cv2.COLOR_RGB2GRAY):
     #   -- detect plate rectangle (straight lines)? this may not be possible...
     #   -- crop by color elements, like the blue country area or flag colors?
     # - try different rotations to level the text (detect straight lines angle first)?
-    # - scale to a standard size (20-40 pt for capital letters)?
+
+    max_h = 85  # ~70p letters
+    opt_h = 25  # ~20p letters
+    if np_image.shape[0] > max_h or (scale and np_image.shape[0] > opt_h):
+        factor = opt_h / np_image.shape[0]
+        np_image = cv2.resize(np_image, (0,0), fx=factor, fy=factor)  #, interpolation = cv2.INTER_NEAREST
 
     if convertion in [cv2.COLOR_RGB2HSV, cv2.COLOR_BGR2HSV]:
-        img_HSV = cv2.cvtColor(np_image, convertion)
+        if len(np_image.shape) == 2:
+            img_bgr = cv2.cvtColor(np_image, cv2.COLOR_GRAY2BGR)
+            img_HSV = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+            # Or just exit with an error?
+        else:
+            img_HSV = cv2.cvtColor(np_image, convertion)
+        #_, _, img_gray = cv2.split(img_HSV)
         img_bw = cv2.inRange(img_HSV, (128, 128, 128), (255, 255, 255))
-        return img_bw
-    elif len(np_image.shape) == 2:
-        img_gray = np_image  #.copy()
     else:
-        img_gray = cv2.cvtColor(np_image, convertion)
+        if len(np_image.shape) == 2:
+            img_gray = np_image  #.copy()
+        else:
+            img_gray = cv2.cvtColor(np_image, convertion)
 
-    #thresh = 127
-    #(thresh, img_bw) = cv2.threshold(img_gray, thresh, 255, cv2.THRESH_BINARY)  #img_bw = img_gray > thresh
+        #thresh = 127
+        #(thresh, img_bw) = cv2.threshold(img_gray, thresh, 255, cv2.THRESH_BINARY)  #img_bw = img_gray > thresh
 
-    #block_size = 11  # Make it proportional to image size?
-    #adjust_avg = -5  # Adapt to brightness?
-    #img_bw = cv2.adaptiveThreshold(img_gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, \
-    #                               block_size, adjust_avg)  # cv2.ADAPTIVE_THRESH_GAUSSIAN_C
+        #block_size = 11  # Make it proportional to image size?
+        #adjust_avg = -5  # Adapt to brightness?
+        #img_bw = cv2.adaptiveThreshold(img_gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, \
+        #                               block_size, adjust_avg)  # cv2.ADAPTIVE_THRESH_GAUSSIAN_C
 
-    #img_blur = cv2.GaussianBlur(img_gray, (3,3), 0)
-    (thresh, img_bw) = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)  #img_blur
-    #print("preprocess_plate() threshold: {}".format(thresh))
+        #img_blur = cv2.GaussianBlur(img_gray, (3,3), 0)
+        (thresh, img_bw) = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)  #img_blur
+        #print("preprocess_plate() threshold: {}".format(thresh))
 
     return img_bw
