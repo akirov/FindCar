@@ -228,8 +228,8 @@ if __name__ == "__main__":
     cv2.waitKey(10000)
     cv2.destroyAllWindows()
 
-    text = pytesseract.image_to_string(img_bgr, config=my_config)
-    print(f"OpenCV BGR image_to_string('{my_config}'): '{text}'\n")
+    #text = pytesseract.image_to_string(img_bgr, config=my_config)
+    #print(f"OpenCV BGR image_to_string('{my_config}'): '{text}'\n")
 
     img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)  # cv2.imread(image_uri, cv2.IMREAD_GRAYSCALE)
     text = pytesseract.image_to_string(img_gray, config=my_config)
